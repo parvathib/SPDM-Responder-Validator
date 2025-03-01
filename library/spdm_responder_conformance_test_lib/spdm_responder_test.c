@@ -9,8 +9,8 @@
 common_test_group_t m_spdm_test_groups[] = {
     {SPDM_RESPONDER_TEST_GROUP_VERSION, "spdm_test_group_version",
      m_spdm_test_group_version},
-    // {SPDM_RESPONDER_TEST_GROUP_CAPABILITIES,      "spdm_test_group_capabilities",
-    //  m_spdm_test_group_capabilities},
+    {SPDM_RESPONDER_TEST_GROUP_CAPABILITIES, "spdm_test_group_capabilities",
+     m_spdm_test_group_capabilities},
     // {SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,        "spdm_test_group_algorithms",
     //  m_spdm_test_group_algorithms},
     // {SPDM_RESPONDER_TEST_GROUP_DIGESTS,           "spdm_test_group_digests",
