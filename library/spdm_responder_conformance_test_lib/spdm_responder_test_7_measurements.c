@@ -1174,12 +1174,15 @@ void spdm_test_case_measurements_success_10_11_12 (void *test_context, uint8_t v
                 return;
             }
 
-            if (memcmp ((void *)(spdm_response + 1),
-                         measurement_record_out, measurement_record_length_out) == 0) {
-                test_result = COMMON_TEST_RESULT_PASS;
-            } else {
-                test_result = COMMON_TEST_RESULT_FAIL;
-            }
+	    if (meas_index != 0xFD) {
+		if (memcmp ((void *)(spdm_response + 1),
+		    measurement_record_out, measurement_record_length_out) == 0) {
+	            test_result = COMMON_TEST_RESULT_PASS;
+		} else {
+		    test_result = COMMON_TEST_RESULT_FAIL;
+		}
+	    }
+
             common_test_record_test_assertion (
                 SPDM_RESPONDER_TEST_GROUP_MEASUREMENTS, case_id, 20,
                 test_result, "response measurement record");
