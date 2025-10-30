@@ -1,7 +1,7 @@
 /**
  *  Copyright Notice:
  *  Copyright 2021 DMTF. All rights reserved.
- *  License: BSD 3-Clause License. For full text see link: https://github.com/DMTF/spdm-emu/blob/main/LICENSE.md
+ *  License: BSD 3-Clause License. For full text see link: https://github.com/DMTF/SPDM-Responder-Validator/blob/main/LICENSE.md
  **/
 
 #include "spdm_responder_test.h"
@@ -9,6 +9,24 @@
 #define SPDM_MESSAGE_A_MASK_VCA             0x1
 #define SPDM_MESSAGE_B_MASK_GET_DIGESTS     0x2
 #define SPDM_MESSAGE_B_MASK_GET_CERTIFICATE 0x4
+
+#define SPDM_VERSION_ALL_COUNT 4
+static spdm_version_number_t spdm_version_all[SPDM_VERSION_ALL_COUNT] = {
+    SPDM_MESSAGE_VERSION_13 << SPDM_VERSION_NUMBER_SHIFT_BIT,
+    SPDM_MESSAGE_VERSION_12 << SPDM_VERSION_NUMBER_SHIFT_BIT,
+    SPDM_MESSAGE_VERSION_11 << SPDM_VERSION_NUMBER_SHIFT_BIT,
+    SPDM_MESSAGE_VERSION_10 << SPDM_VERSION_NUMBER_SHIFT_BIT,
+};
+
+#pragma pack(1)
+typedef struct {
+    spdm_message_header_t header;
+    /* param1 == slot_id
+     * param2 == HashType*/
+    uint8_t nonce[32];
+    uint8_t requester_context[SPDM_REQ_CONTEXT_SIZE];
+} spdm_challenge_request_13_t;
+#pragma pack()
 
 #pragma pack(1)
 typedef struct {
@@ -53,6 +71,10 @@ bool spdm_test_case_challenge_auth_setup_vca_digest (void *test_context,
         parameter.location = LIBSPDM_DATA_LOCATION_LOCAL;
         libspdm_set_data(spdm_context, LIBSPDM_DATA_SPDM_VERSION, &parameter,
                          spdm_version, sizeof(spdm_version_number_t) * spdm_version_count);
+    } else {
+        parameter.location = LIBSPDM_DATA_LOCATION_LOCAL;
+        libspdm_set_data(spdm_context, LIBSPDM_DATA_SPDM_VERSION, &parameter,
+                         spdm_version_all, sizeof(spdm_version_number_t) * SPDM_VERSION_ALL_COUNT);
     }
 
     data32 = SPDM_GET_CAPABILITIES_REQUEST_FLAGS_CERT_CAP |
@@ -121,7 +143,7 @@ bool spdm_test_case_challenge_auth_setup_vca_digest (void *test_context,
              SPDM_ALGORITHMS_BASE_ASYM_ALGO_EDDSA_ED448;
     libspdm_set_data(spdm_context, LIBSPDM_DATA_REQ_BASE_ASYM_ALG, &parameter,
                      &data16, sizeof(data16));
-    data16 = SPDM_ALGORITHMS_KEY_SCHEDULE_HMAC_HASH;
+    data16 = SPDM_ALGORITHMS_KEY_SCHEDULE_SPDM;
     libspdm_set_data(spdm_context, LIBSPDM_DATA_KEY_SCHEDULE, &parameter, &data16,
                      sizeof(data16));
     data8 = SPDM_ALGORITHMS_OPAQUE_DATA_FORMAT_1;
@@ -189,7 +211,7 @@ bool spdm_test_case_challenge_auth_setup_vca_digest (void *test_context,
 
     spdm_test_context->test_scratch_buffer_size = offsetof(spdm_challenge_auth_test_buffer_t,
                                                            total_digest_buffer) +
-                                                  test_buffer->hash_size * test_buffer->slot_count;
+                                                           test_buffer->hash_size * test_buffer->slot_count;
 
     return true;
 }
@@ -203,73 +225,22 @@ bool spdm_test_case_challenge_auth_setup_version_10_11 (void *test_context)
 {
     spdm_version_number_t spdm_version[] = {
         SPDM_MESSAGE_VERSION_11 << SPDM_VERSION_NUMBER_SHIFT_BIT,
-            SPDM_MESSAGE_VERSION_10 << SPDM_VERSION_NUMBER_SHIFT_BIT
+        SPDM_MESSAGE_VERSION_10 << SPDM_VERSION_NUMBER_SHIFT_BIT,
     };
     return spdm_test_case_challenge_auth_setup_vca_digest (test_context,
                                                            LIBSPDM_ARRAY_SIZE(
-                                                               spdm_version), spdm_version);
+                                                           spdm_version), spdm_version);
 }
 
 bool spdm_test_case_challenge_auth_setup_version_12 (void *test_context)
 {
     spdm_version_number_t spdm_version[] = {
-        SPDM_MESSAGE_VERSION_12 << SPDM_VERSION_NUMBER_SHIFT_BIT
+        SPDM_MESSAGE_VERSION_12 << SPDM_VERSION_NUMBER_SHIFT_BIT,
+        SPDM_MESSAGE_VERSION_13 << SPDM_VERSION_NUMBER_SHIFT_BIT,
     };
     return spdm_test_case_challenge_auth_setup_vca_digest (test_context,
                                                            LIBSPDM_ARRAY_SIZE(
-                                                               spdm_version), spdm_version);
-}
-
-bool spdm_test_case_challenge_auth_setup_version_capabilities (void *test_context)
-{
-    spdm_test_context_t *spdm_test_context;
-    void *spdm_context;
-    libspdm_return_t status;
-    libspdm_data_parameter_t parameter;
-    size_t data_size;
-    spdm_version_number_t spdm_version;
-    spdm_challenge_auth_test_buffer_t *test_buffer;
-
-    spdm_test_context = test_context;
-    spdm_context = spdm_test_context->spdm_context;
-
-    status = libspdm_get_version (spdm_context, NULL, NULL);
-    if (LIBSPDM_STATUS_IS_ERROR(status)) {
-        return false;
-    }
-
-    status = libspdm_get_capabilities (spdm_context);
-    if (LIBSPDM_STATUS_IS_ERROR(status)) {
-        return false;
-    }
-
-    test_buffer = (void *)spdm_test_context->test_scratch_buffer;
-    LIBSPDM_ASSERT(sizeof(spdm_test_context->test_scratch_buffer) >=
-                   sizeof(spdm_challenge_auth_test_buffer_t));
-    libspdm_zero_mem(test_buffer, sizeof(spdm_challenge_auth_test_buffer_t));
-    spdm_test_context->test_scratch_buffer_size = sizeof(spdm_challenge_auth_test_buffer_t);
-
-    data_size = sizeof(test_buffer->rsp_cap_flags);
-    libspdm_zero_mem(&parameter, sizeof(parameter));
-    parameter.location = LIBSPDM_DATA_LOCATION_CONNECTION;
-    libspdm_get_data(spdm_context, LIBSPDM_DATA_CAPABILITY_FLAGS, &parameter,
-                     &test_buffer->rsp_cap_flags, &data_size);
-    if (((test_buffer->rsp_cap_flags & SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_CERT_CAP) == 0) ||
-        ((test_buffer->rsp_cap_flags & SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_CHAL_CAP) == 0)) {
-        return false;
-    }
-
-    spdm_version = 0;
-    data_size = sizeof(spdm_version);
-    libspdm_zero_mem(&parameter, sizeof(parameter));
-    parameter.location = LIBSPDM_DATA_LOCATION_CONNECTION;
-    libspdm_get_data(spdm_context, LIBSPDM_DATA_SPDM_VERSION, &parameter, &spdm_version,
-                     &data_size);
-    test_buffer->version = (spdm_version >> SPDM_VERSION_NUMBER_SHIFT_BIT);
-
-    spdm_test_context->test_scratch_buffer_size = sizeof(test_buffer->version);
-
-    return true;
+                                                           spdm_version), spdm_version);
 }
 
 void spdm_test_case_challenge_auth_success_10_12 (void *test_context, uint8_t version,
@@ -279,8 +250,10 @@ void spdm_test_case_challenge_auth_success_10_12 (void *test_context, uint8_t ve
     void *spdm_context;
     libspdm_return_t status;
     spdm_challenge_request_t spdm_request;
+    spdm_challenge_request_13_t spdm_request_13;
     spdm_challenge_auth_response_t *spdm_response;
     uint8_t message[LIBSPDM_MAX_SPDM_MSG_SIZE];
+    size_t spdm_request_size;
     size_t spdm_response_size;
     common_test_result_t test_result;
     spdm_challenge_auth_test_buffer_t *test_buffer;
@@ -327,7 +300,9 @@ void spdm_test_case_challenge_auth_success_10_12 (void *test_context, uint8_t ve
         }
         break;
     case SPDM_MESSAGE_VERSION_12:
-        LIBSPDM_ASSERT (test_buffer->version == SPDM_MESSAGE_VERSION_12);
+    case SPDM_MESSAGE_VERSION_13:
+        LIBSPDM_ASSERT ((test_buffer->version == SPDM_MESSAGE_VERSION_12) ||
+                        (test_buffer->version == SPDM_MESSAGE_VERSION_13));
         switch (message_mask) {
         case SPDM_MESSAGE_A_MASK_VCA | SPDM_MESSAGE_B_MASK_GET_DIGESTS |
             SPDM_MESSAGE_B_MASK_GET_CERTIFICATE:
@@ -387,7 +362,7 @@ void spdm_test_case_challenge_auth_success_10_12 (void *test_context, uint8_t ve
             status = libspdm_init_connection (spdm_context, false);
             if (LIBSPDM_STATUS_IS_ERROR(status)) {
                 common_test_record_test_assertion (
-                    SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH, case_id, COMMON_TEST_ID_END,
+                    SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH, case_id, 0,
                     COMMON_TEST_RESULT_NOT_TESTED, "init_connection failure");
                 continue;
             }
@@ -398,7 +373,7 @@ void spdm_test_case_challenge_auth_success_10_12 (void *test_context, uint8_t ve
                                        measurement_hash_type[meas_hash_type_index], NULL, NULL);
                 if (LIBSPDM_STATUS_IS_ERROR(status)) {
                     common_test_record_test_assertion (
-                        SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH, case_id, COMMON_TEST_ID_END,
+                        SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH, case_id, 0,
                         COMMON_TEST_RESULT_NOT_TESTED, "first challenge failure");
                     continue;
                 }
@@ -408,7 +383,7 @@ void spdm_test_case_challenge_auth_success_10_12 (void *test_context, uint8_t ve
                 status = libspdm_get_digest (spdm_context, NULL, NULL, NULL);
                 if (LIBSPDM_STATUS_IS_ERROR(status)) {
                     common_test_record_test_assertion (
-                        SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH, case_id, COMMON_TEST_ID_END,
+                        SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH, case_id, 0,
                         COMMON_TEST_RESULT_NOT_TESTED, "get_digest failure");
                     continue;
                 }
@@ -420,28 +395,48 @@ void spdm_test_case_challenge_auth_success_10_12 (void *test_context, uint8_t ve
                                                   &m_cert_chain_buffer_size, m_cert_chain_buffer);
                 if (LIBSPDM_STATUS_IS_ERROR(status)) {
                     common_test_record_test_assertion (
-                        SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH, case_id, COMMON_TEST_ID_END,
+                        SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH, case_id, 0,
                         COMMON_TEST_RESULT_NOT_TESTED, "get_certificate failure");
                     continue;
                 }
             }
 
-            libspdm_zero_mem(&spdm_request, sizeof(spdm_request));
-            spdm_request.header.spdm_version = test_buffer->version;
-            spdm_request.header.request_response_code = SPDM_CHALLENGE;
-            spdm_request.header.param1 = slot_id;
-            spdm_request.header.param2 = measurement_hash_type[meas_hash_type_index];
             /* ignore spdm_request.nonce */
+
+            if (test_buffer->version <= SPDM_MESSAGE_VERSION_12) {
+                libspdm_zero_mem(&spdm_request, sizeof(spdm_request));
+                spdm_request.header.spdm_version = test_buffer->version;
+                spdm_request.header.request_response_code = SPDM_CHALLENGE;
+                spdm_request.header.param1 = slot_id;
+                spdm_request.header.param2 = measurement_hash_type[meas_hash_type_index];
+                spdm_request_size = sizeof(spdm_request);
+            } else {
+                libspdm_zero_mem(&spdm_request, sizeof(spdm_request_13));
+                spdm_request_13.header.spdm_version = test_buffer->version;
+                spdm_request_13.header.request_response_code = SPDM_CHALLENGE;
+                spdm_request_13.header.param1 = slot_id;
+                spdm_request_13.header.param2 = measurement_hash_type[meas_hash_type_index];
+                libspdm_get_random_number(SPDM_REQ_CONTEXT_SIZE, &spdm_request_13.requester_context[0]);
+                spdm_request_size = sizeof(spdm_request) + SPDM_REQ_CONTEXT_SIZE;
+            }
 
             spdm_response = (void *)message;
             spdm_response_size = sizeof(message);
             libspdm_zero_mem(message, sizeof(message));
-            status = libspdm_send_receive_data(spdm_context, NULL, false,
-                                               &spdm_request, sizeof(spdm_request),
-                                               spdm_response, &spdm_response_size);
+            
+            if (test_buffer->version <= SPDM_MESSAGE_VERSION_12) {
+                status = libspdm_send_receive_data(spdm_context, NULL, false,
+                                                   &spdm_request, spdm_request_size,
+                                                   spdm_response, &spdm_response_size);
+            } else {
+                status = libspdm_send_receive_data(spdm_context, NULL, false,
+                                                   &spdm_request_13, spdm_request_size,
+                                                   spdm_response, &spdm_response_size);
+            }
+
             if (LIBSPDM_STATUS_IS_ERROR(status)) {
                 common_test_record_test_assertion (
-                    SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH, case_id, COMMON_TEST_ID_END,
+                    SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH, case_id, 0,
                     COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
                 return;
             }
@@ -484,6 +479,21 @@ void spdm_test_case_challenge_auth_success_10_12 (void *test_context, uint8_t ve
                          test_buffer->hash_size + SPDM_NONCE_SIZE +
                          meas_hash_size + sizeof(uint16_t) +
                          *opaque_length_ptr);
+
+            if (test_buffer->version >= SPDM_MESSAGE_VERSION_13) {
+                uint8_t *requester_context = (uint8_t*)signature_ptr;
+
+                if (memcmp(requester_context, spdm_request_13.requester_context, SPDM_REQ_CONTEXT_SIZE) != 0) {
+                    test_result = COMMON_TEST_RESULT_FAIL;
+                } else {
+                    test_result = COMMON_TEST_RESULT_PASS;
+                }
+
+                common_test_record_test_assertion (SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH, case_id, 8,
+                test_result, "requester_context - %lx", &spdm_request_13.requester_context);
+
+                signature_ptr += SPDM_REQ_CONTEXT_SIZE;
+            }
 
             if (spdm_response->header.request_response_code == SPDM_CHALLENGE_AUTH) {
                 test_result = COMMON_TEST_RESULT_PASS;
@@ -548,11 +558,17 @@ void spdm_test_case_challenge_auth_success_10_12 (void *test_context, uint8_t ve
                 return;
             }
 
-            status = libspdm_append_message_c(spdm_context, &spdm_request,
-                                              sizeof(spdm_request));
+            if (test_buffer->version <= SPDM_MESSAGE_VERSION_12) {
+                status = libspdm_append_message_c(spdm_context, &spdm_request,
+                                                  spdm_request_size);
+            } else {
+                status = libspdm_append_message_c(spdm_context, &spdm_request_13,
+                                                  spdm_request_size);
+            }
+
             if (LIBSPDM_STATUS_IS_ERROR(status)) {
                 common_test_record_test_assertion (
-                    SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH, case_id, COMMON_TEST_ID_END,
+                    SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH, case_id, 0,
                     COMMON_TEST_RESULT_NOT_TESTED, "append_message_c failure");
                 return;
             }
@@ -560,7 +576,7 @@ void spdm_test_case_challenge_auth_success_10_12 (void *test_context, uint8_t ve
                                               (size_t)signature_ptr - (size_t)spdm_response);
             if (LIBSPDM_STATUS_IS_ERROR(status)) {
                 common_test_record_test_assertion (
-                    SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH, case_id, COMMON_TEST_ID_END,
+                    SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH, case_id, 0,
                     COMMON_TEST_RESULT_NOT_TESTED, "append_message_c failure");
                 return;
             }
@@ -678,10 +694,7 @@ void spdm_test_case_challenge_auth_version_mismatch (void *test_context)
     size_t spdm_response_size;
     common_test_result_t test_result;
     spdm_challenge_auth_test_buffer_t *test_buffer;
-    uint8_t mismatched_version[] = {
-        SPDM_MESSAGE_VERSION_10 - 1,
-        SPDM_MESSAGE_VERSION_12 + 1,
-    };
+    uint8_t mismatched_version[2];
     size_t index;
 
     spdm_test_context = test_context;
@@ -712,7 +725,7 @@ void spdm_test_case_challenge_auth_version_mismatch (void *test_context)
         if (LIBSPDM_STATUS_IS_ERROR(status)) {
             common_test_record_test_assertion (
                 SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH,
-                SPDM_RESPONDER_TEST_CASE_CHALLENGE_AUTH_VERSION_MISMATCH, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_CASE_CHALLENGE_AUTH_VERSION_MISMATCH, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
             continue;
         }
@@ -778,107 +791,6 @@ void spdm_test_case_challenge_auth_version_mismatch (void *test_context)
     }
 }
 
-void spdm_test_case_challenge_auth_unexpected_request (void *test_context)
-{
-    spdm_test_context_t *spdm_test_context;
-    void *spdm_context;
-    libspdm_return_t status;
-    spdm_challenge_request_t spdm_request;
-    spdm_challenge_auth_response_t *spdm_response;
-    size_t spdm_response_size;
-    uint8_t message[LIBSPDM_MAX_SPDM_MSG_SIZE];
-    common_test_result_t test_result;
-    spdm_challenge_auth_test_buffer_t *test_buffer;
-
-    spdm_test_context = test_context;
-    spdm_context = spdm_test_context->spdm_context;
-    test_buffer = (void *)spdm_test_context->test_scratch_buffer;
-    LIBSPDM_ASSERT(spdm_test_context->test_scratch_buffer_size ==
-                   sizeof(test_buffer->version));
-
-    libspdm_zero_mem(&spdm_request, sizeof(spdm_request));
-    spdm_request.header.spdm_version = test_buffer->version;
-    spdm_request.header.request_response_code = SPDM_CHALLENGE;
-    spdm_request.header.param1 = 0;
-    spdm_request.header.param2 = SPDM_CHALLENGE_REQUEST_NO_MEASUREMENT_SUMMARY_HASH;
-
-    spdm_response = (void *)message;
-    spdm_response_size = sizeof(message);
-    libspdm_zero_mem(message, sizeof(message));
-    status = libspdm_send_receive_data(spdm_context, NULL, false,
-                                       &spdm_request, sizeof(spdm_request),
-                                       spdm_response, &spdm_response_size);
-    if (LIBSPDM_STATUS_IS_ERROR(status)) {
-        common_test_record_test_assertion (
-            SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH,
-            SPDM_RESPONDER_TEST_CASE_CHALLENGE_AUTH_UNEXPECTED_REQUEST, COMMON_TEST_ID_END,
-            COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
-        return;
-    }
-
-    if (spdm_response_size >= sizeof(spdm_error_response_t)) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH,
-        SPDM_RESPONDER_TEST_CASE_CHALLENGE_AUTH_UNEXPECTED_REQUEST, 1,
-        test_result, "response size - %d", spdm_response_size);
-    if (test_result == COMMON_TEST_RESULT_FAIL) {
-        return;
-    }
-
-    if (spdm_response->header.request_response_code == SPDM_ERROR) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH,
-        SPDM_RESPONDER_TEST_CASE_CHALLENGE_AUTH_UNEXPECTED_REQUEST, 2,
-        test_result, "response code - 0x%02x", spdm_response->header.request_response_code);
-    if (test_result == COMMON_TEST_RESULT_FAIL) {
-        return;
-    }
-
-    if (spdm_response->header.spdm_version == test_buffer->version) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH,
-        SPDM_RESPONDER_TEST_CASE_CHALLENGE_AUTH_UNEXPECTED_REQUEST, 3,
-        test_result, "response version - 0x%02x", spdm_response->header.spdm_version);
-    if (test_result == COMMON_TEST_RESULT_FAIL) {
-        return;
-    }
-
-    if (spdm_response->header.param1 == SPDM_ERROR_CODE_UNEXPECTED_REQUEST) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH,
-        SPDM_RESPONDER_TEST_CASE_CHALLENGE_AUTH_UNEXPECTED_REQUEST, 4,
-        test_result, "response param1 - 0x%02x", spdm_response->header.param1);
-    if (test_result == COMMON_TEST_RESULT_FAIL) {
-        return;
-    }
-
-    if (spdm_response->header.param2 == 0) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH,
-        SPDM_RESPONDER_TEST_CASE_CHALLENGE_AUTH_UNEXPECTED_REQUEST, 5,
-        test_result, "response param2 - 0x%02x", spdm_response->header.param2);
-}
-
 void spdm_test_case_challenge_auth_invalid_request (void *test_context)
 {
     spdm_test_context_t *spdm_test_context;
@@ -940,7 +852,7 @@ void spdm_test_case_challenge_auth_invalid_request (void *test_context)
         if (LIBSPDM_STATUS_IS_ERROR(status)) {
             common_test_record_test_assertion (
                 SPDM_RESPONDER_TEST_GROUP_CHALLENGE_AUTH,
-                SPDM_RESPONDER_TEST_CASE_CHALLENGE_AUTH_INVALID_REQUEST, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_CASE_CHALLENGE_AUTH_INVALID_REQUEST, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
             continue;
         }
@@ -1026,11 +938,6 @@ common_test_case_t m_spdm_test_group_challenge_auth[] = {
      "spdm_test_case_challenge_auth_version_mismatch",
      spdm_test_case_challenge_auth_version_mismatch,
      spdm_test_case_challenge_auth_setup_version_any,
-     spdm_test_case_common_teardown},
-    {SPDM_RESPONDER_TEST_CASE_CHALLENGE_AUTH_UNEXPECTED_REQUEST,
-     "spdm_test_case_challenge_auth_unexpected_request",
-     spdm_test_case_challenge_auth_unexpected_request,
-     spdm_test_case_challenge_auth_setup_version_capabilities,
      spdm_test_case_common_teardown},
     {SPDM_RESPONDER_TEST_CASE_CHALLENGE_AUTH_INVALID_REQUEST,
      "spdm_test_case_challenge_auth_invalid_request",

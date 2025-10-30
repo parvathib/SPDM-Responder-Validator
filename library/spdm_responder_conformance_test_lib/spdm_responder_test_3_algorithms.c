@@ -1,7 +1,7 @@
 /**
  *  Copyright Notice:
  *  Copyright 2021-2025 DMTF. All rights reserved.
- *  License: BSD 3-Clause License. For full text see link: https://github.com/DMTF/spdm-emu/blob/main/LICENSE.md
+ *  License: BSD 3-Clause License. For full text see link: https://github.com/DMTF/SPDM-Responder-Validator/blob/main/LICENSE.md
  **/
 
 #include "spdm_responder_test.h"
@@ -123,53 +123,16 @@ bool spdm_test_case_algorithms_setup_version_12 (void *test_context)
         SPDM_VERSION_NUMBER_SHIFT_BIT);
 }
 
+bool spdm_test_case_algorithms_setup_version_13 (void *test_context)
+{
+    return spdm_test_case_algorithms_setup_version_capabilities (test_context,
+                                                                 SPDM_MESSAGE_VERSION_13 <<
+        SPDM_VERSION_NUMBER_SHIFT_BIT);
+}
+
 bool spdm_test_case_algorithms_setup_version_any (void *test_context)
 {
     return spdm_test_case_algorithms_setup_version_capabilities (test_context, 0);
-}
-
-bool spdm_test_case_algorithms_setup_version_only (void *test_context)
-{
-    spdm_test_context_t *spdm_test_context;
-    void *spdm_context;
-    libspdm_return_t status;
-    libspdm_data_parameter_t parameter;
-    spdm_version_number_t spdm_version;
-    size_t data_size;
-    spdm_algorithms_test_buffer_t *test_buffer;
-    uint8_t version_number_entry_count;
-    spdm_version_number_t version_number_entry[LIBSPDM_MAX_VERSION_COUNT];
-
-    spdm_test_context = test_context;
-    spdm_context = spdm_test_context->spdm_context;
-
-    test_buffer = (void *)spdm_test_context->test_scratch_buffer;
-    LIBSPDM_ASSERT(sizeof(spdm_test_context->test_scratch_buffer) >=
-                   sizeof(spdm_algorithms_test_buffer_t));
-    libspdm_zero_mem(test_buffer, sizeof(spdm_algorithms_test_buffer_t));
-    spdm_test_context->test_scratch_buffer_size = sizeof(spdm_algorithms_test_buffer_t);
-
-    version_number_entry_count = LIBSPDM_MAX_VERSION_COUNT;
-    status = libspdm_get_version (spdm_context, &version_number_entry_count, version_number_entry);
-    if (LIBSPDM_STATUS_IS_ERROR(status)) {
-        return false;
-    }
-
-    spdm_version = 0;
-    data_size = sizeof(spdm_version);
-    libspdm_zero_mem(&parameter, sizeof(parameter));
-    parameter.location = LIBSPDM_DATA_LOCATION_CONNECTION;
-    libspdm_get_data(spdm_context, LIBSPDM_DATA_SPDM_VERSION, &parameter, &spdm_version,
-                     &data_size);
-    test_buffer->version = (spdm_version >> SPDM_VERSION_NUMBER_SHIFT_BIT);
-
-    data_size = sizeof(test_buffer->rsp_cap_flags);
-    libspdm_zero_mem(&parameter, sizeof(parameter));
-    parameter.location = LIBSPDM_DATA_LOCATION_CONNECTION;
-    libspdm_get_data(spdm_context, LIBSPDM_DATA_CAPABILITY_FLAGS, &parameter,
-                     &test_buffer->rsp_cap_flags, &data_size);
-
-    return true;
 }
 
 void spdm_test_case_algorithms_success_10 (void *test_context)
@@ -225,7 +188,7 @@ void spdm_test_case_algorithms_success_10 (void *test_context)
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_10,
-            COMMON_TEST_ID_END,
+            0,
             COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
         return;
     }
@@ -403,10 +366,7 @@ void spdm_test_case_algorithms_version_mismatch (void *test_context)
     size_t spdm_response_size;
     common_test_result_t test_result;
     spdm_algorithms_test_buffer_t *test_buffer;
-    uint8_t mismatched_version[] = {
-        SPDM_MESSAGE_VERSION_10 - 1,
-        SPDM_MESSAGE_VERSION_12 + 1,
-    };
+    uint8_t mismatched_version[2];
     size_t index;
 
     spdm_test_context = test_context;
@@ -455,7 +415,7 @@ void spdm_test_case_algorithms_version_mismatch (void *test_context)
         if (LIBSPDM_STATUS_IS_ERROR(status)) {
             common_test_record_test_assertion (
                 SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-                SPDM_RESPONDER_TEST_CASE_ALGORITHMS_VERSION_MISMATCH, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_CASE_ALGORITHMS_VERSION_MISMATCH, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
             continue;
         }
@@ -519,202 +479,6 @@ void spdm_test_case_algorithms_version_mismatch (void *test_context)
             SPDM_RESPONDER_TEST_CASE_ALGORITHMS_VERSION_MISMATCH, 5,
             test_result, "response param2 - 0x%02x", spdm_response->header.param2);
     }
-}
-
-void spdm_test_case_algorithms_unexpected_request (void *test_context)
-{
-    spdm_test_context_t *spdm_test_context;
-    void *spdm_context;
-    libspdm_return_t status;
-    spdm_negotiate_algorithms_request_mine_t spdm_request;
-    size_t spdm_request_size;
-    spdm_algorithms_response_t *spdm_response;
-    size_t spdm_response_size;
-    uint8_t message[LIBSPDM_MAX_SPDM_MSG_SIZE];
-    common_test_result_t test_result;
-    spdm_algorithms_test_buffer_t *test_buffer;
-    uint8_t version;
-
-    spdm_test_context = test_context;
-    spdm_context = spdm_test_context->spdm_context;
-    test_buffer = (void *)spdm_test_context->test_scratch_buffer;
-    LIBSPDM_ASSERT (spdm_test_context->test_scratch_buffer_size ==
-                    sizeof(spdm_algorithms_test_buffer_t));
-
-    /* libspdm_check_request_version_compability will set the connection_info version
-     * This case receives a NEGOTIATE_ALGORITHMS before GET_CAPABILITIES, the conection_info version is 0*/
-    version = 0;
-    if (test_buffer->version >= SPDM_MESSAGE_VERSION_11) {
-        spdm_request_size = sizeof(spdm_request);
-    } else {
-        spdm_request_size = sizeof(spdm_request) - sizeof(spdm_request.struct_table);
-    }
-
-    libspdm_zero_mem(&spdm_request, sizeof(spdm_request));
-    spdm_request.header.spdm_version = version;
-    spdm_request.length = (uint16_t)spdm_request_size;
-    if (test_buffer->version >= SPDM_MESSAGE_VERSION_11) {
-        spdm_request.header.param1 = 4;
-    } else {
-        spdm_request.header.param1 = 0;
-    }
-    spdm_request.header.request_response_code = SPDM_NEGOTIATE_ALGORITHMS;
-    spdm_request.header.param2 = 0;
-    if (test_buffer->version >= SPDM_MESSAGE_VERSION_12) {
-        spdm_request.other_params_support = SPDM_ALGORITHMS_OPAQUE_DATA_FORMAT_1;
-    }
-    spdm_request.measurement_specification = SPDM_MEASUREMENT_SPECIFICATION_DMTF;
-    spdm_request.base_asym_algo = SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSASSA_2048 |
-                                  SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSAPSS_2048 |
-                                  SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSASSA_3072 |
-                                  SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSAPSS_3072 |
-                                  SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P256 |
-                                  SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSASSA_4096 |
-                                  SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSAPSS_4096 |
-                                  SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P384 |
-                                  SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P521;
-    if (test_buffer->version >= SPDM_MESSAGE_VERSION_12) {
-        spdm_request.base_asym_algo |= SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_SM2_ECC_SM2_P256 |
-                                       SPDM_ALGORITHMS_BASE_ASYM_ALGO_EDDSA_ED25519 |
-                                       SPDM_ALGORITHMS_BASE_ASYM_ALGO_EDDSA_ED448;
-    }
-    spdm_request.base_hash_algo = SPDM_ALGORITHMS_BASE_HASH_ALGO_TPM_ALG_SHA_256 |
-                                  SPDM_ALGORITHMS_BASE_HASH_ALGO_TPM_ALG_SHA_384 |
-                                  SPDM_ALGORITHMS_BASE_HASH_ALGO_TPM_ALG_SHA_512 |
-                                  SPDM_ALGORITHMS_BASE_HASH_ALGO_TPM_ALG_SHA3_256 |
-                                  SPDM_ALGORITHMS_BASE_HASH_ALGO_TPM_ALG_SHA3_384 |
-                                  SPDM_ALGORITHMS_BASE_HASH_ALGO_TPM_ALG_SHA3_512;
-    if (test_buffer->version >= SPDM_MESSAGE_VERSION_12) {
-        spdm_request.base_hash_algo |= SPDM_ALGORITHMS_BASE_HASH_ALGO_TPM_ALG_SM3_256;
-    }
-    spdm_request.ext_asym_count = 0;
-    spdm_request.ext_hash_count = 0;
-    spdm_request.struct_table[0].alg_type = SPDM_NEGOTIATE_ALGORITHMS_STRUCT_TABLE_ALG_TYPE_DHE;
-    spdm_request.struct_table[0].alg_count = 0x20;
-    spdm_request.struct_table[0].alg_supported = SPDM_ALGORITHMS_DHE_NAMED_GROUP_FFDHE_2048 |
-                                                 SPDM_ALGORITHMS_DHE_NAMED_GROUP_FFDHE_3072 |
-                                                 SPDM_ALGORITHMS_DHE_NAMED_GROUP_FFDHE_4096 |
-                                                 SPDM_ALGORITHMS_DHE_NAMED_GROUP_SECP_256_R1 |
-                                                 SPDM_ALGORITHMS_DHE_NAMED_GROUP_SECP_384_R1 |
-                                                 SPDM_ALGORITHMS_DHE_NAMED_GROUP_SECP_521_R1;
-    if (test_buffer->version >= SPDM_MESSAGE_VERSION_12) {
-        spdm_request.struct_table[0].alg_supported |= SPDM_ALGORITHMS_DHE_NAMED_GROUP_SM2_P256;
-    }
-    spdm_request.struct_table[1].alg_type = SPDM_NEGOTIATE_ALGORITHMS_STRUCT_TABLE_ALG_TYPE_AEAD;
-    spdm_request.struct_table[1].alg_count = 0x20;
-    spdm_request.struct_table[1].alg_supported = SPDM_ALGORITHMS_AEAD_CIPHER_SUITE_AES_128_GCM |
-                                                 SPDM_ALGORITHMS_AEAD_CIPHER_SUITE_AES_256_GCM |
-                                                 SPDM_ALGORITHMS_AEAD_CIPHER_SUITE_CHACHA20_POLY1305;
-    if (test_buffer->version >= SPDM_MESSAGE_VERSION_12) {
-        spdm_request.struct_table[1].alg_supported |=
-            SPDM_ALGORITHMS_AEAD_CIPHER_SUITE_AEAD_SM4_GCM;
-    }
-    spdm_request.struct_table[2].alg_type =
-        SPDM_NEGOTIATE_ALGORITHMS_STRUCT_TABLE_ALG_TYPE_REQ_BASE_ASYM_ALG;
-    spdm_request.struct_table[2].alg_count = 0x20;
-    spdm_request.struct_table[2].alg_supported =
-        SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSASSA_2048 |
-        SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSAPSS_2048
-        |
-        SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSASSA_3072
-        |
-        SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSAPSS_3072
-        |
-        SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P256
-        |
-        SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSASSA_4096
-        |
-        SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSAPSS_4096
-        |
-        SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P384
-        |
-        SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P521;
-    if (test_buffer->version >= SPDM_MESSAGE_VERSION_12) {
-        spdm_request.struct_table[2].alg_supported |=
-            SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_SM2_ECC_SM2_P256 |
-            SPDM_ALGORITHMS_BASE_ASYM_ALGO_EDDSA_ED25519 |
-            SPDM_ALGORITHMS_BASE_ASYM_ALGO_EDDSA_ED448;
-    }
-    spdm_request.struct_table[3].alg_type =
-        SPDM_NEGOTIATE_ALGORITHMS_STRUCT_TABLE_ALG_TYPE_KEY_SCHEDULE;
-    spdm_request.struct_table[3].alg_count = 0x20;
-    spdm_request.struct_table[3].alg_supported = SPDM_ALGORITHMS_KEY_SCHEDULE_HMAC_HASH;
-
-    spdm_response = (void *)message;
-    spdm_response_size = sizeof(message);
-    libspdm_zero_mem(message, sizeof(message));
-    status = libspdm_send_receive_data(spdm_context, NULL, false,
-                                       &spdm_request, spdm_request.length,
-                                       spdm_response, &spdm_response_size);
-    if (LIBSPDM_STATUS_IS_ERROR(status)) {
-        common_test_record_test_assertion (
-            SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-            SPDM_RESPONDER_TEST_CASE_ALGORITHMS_UNEXPECTED_REQUEST, COMMON_TEST_ID_END,
-            COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
-        return;
-    }
-
-    if (spdm_response_size >= sizeof(spdm_error_response_t)) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-        SPDM_RESPONDER_TEST_CASE_ALGORITHMS_UNEXPECTED_REQUEST, 1,
-        test_result, "response size - %d", spdm_response_size);
-    if (test_result == COMMON_TEST_RESULT_FAIL) {
-        return;
-    }
-
-    if (spdm_response->header.request_response_code == SPDM_ERROR) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-        SPDM_RESPONDER_TEST_CASE_ALGORITHMS_UNEXPECTED_REQUEST, 2,
-        test_result, "response code - 0x%02x", spdm_response->header.request_response_code);
-    if (test_result == COMMON_TEST_RESULT_FAIL) {
-        return;
-    }
-
-    if (spdm_response->header.spdm_version == SPDM_MESSAGE_VERSION_10) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-        SPDM_RESPONDER_TEST_CASE_ALGORITHMS_UNEXPECTED_REQUEST, 3,
-        test_result, "response version - 0x%02x", spdm_response->header.spdm_version);
-    if (test_result == COMMON_TEST_RESULT_FAIL) {
-        return;
-    }
-
-    if (spdm_response->header.param1 == SPDM_ERROR_CODE_UNEXPECTED_REQUEST) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-        SPDM_RESPONDER_TEST_CASE_ALGORITHMS_UNEXPECTED_REQUEST, 4,
-        test_result, "response param1 - 0x%02x", spdm_response->header.param1);
-    if (test_result == COMMON_TEST_RESULT_FAIL) {
-        return;
-    }
-
-    if (spdm_response->header.param2 == 0) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-        SPDM_RESPONDER_TEST_CASE_ALGORITHMS_UNEXPECTED_REQUEST, 5,
-        test_result, "response param2 - 0x%02x", spdm_response->header.param2);
 }
 
 void spdm_test_case_algorithms_invalid_request (void *test_context)
@@ -832,7 +596,7 @@ void spdm_test_case_algorithms_invalid_request (void *test_context)
     spdm_request.struct_table[3].alg_type =
         SPDM_NEGOTIATE_ALGORITHMS_STRUCT_TABLE_ALG_TYPE_KEY_SCHEDULE;
     spdm_request.struct_table[3].alg_count = 0x20;
-    spdm_request.struct_table[3].alg_supported = SPDM_ALGORITHMS_KEY_SCHEDULE_HMAC_HASH;
+    spdm_request.struct_table[3].alg_supported = SPDM_ALGORITHMS_KEY_SCHEDULE_SPDM;
 
     for (index = 0; index < 6; index++) {
         libspdm_copy_mem (&spdm_request_new, sizeof(spdm_request_new), &spdm_request,
@@ -890,7 +654,7 @@ void spdm_test_case_algorithms_invalid_request (void *test_context)
         if (LIBSPDM_STATUS_IS_ERROR(status)) {
             common_test_record_test_assertion (
                 SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-                SPDM_RESPONDER_TEST_CASE_ALGORITHMS_INVALID_REQUEST, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_CASE_ALGORITHMS_INVALID_REQUEST, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
             continue;
         }
@@ -1054,7 +818,7 @@ void spdm_test_case_algorithms_success_11 (void *test_context)
     spdm_request.struct_table[3].alg_type =
         SPDM_NEGOTIATE_ALGORITHMS_STRUCT_TABLE_ALG_TYPE_KEY_SCHEDULE;
     spdm_request.struct_table[3].alg_count = 0x20;
-    spdm_request.struct_table[3].alg_supported = SPDM_ALGORITHMS_KEY_SCHEDULE_HMAC_HASH;
+    spdm_request.struct_table[3].alg_supported = SPDM_ALGORITHMS_KEY_SCHEDULE_SPDM;
 
     spdm_response = (void *)message;
     spdm_response_size = sizeof(message);
@@ -1065,7 +829,7 @@ void spdm_test_case_algorithms_success_11 (void *test_context)
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_11,
-            COMMON_TEST_ID_END,
+            0,
             COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
         return;
     }
@@ -1265,7 +1029,7 @@ void spdm_test_case_algorithms_success_11 (void *test_context)
                 test_result = COMMON_TEST_RESULT_FAIL;
                 common_test_record_test_assertion (
                     SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-                    SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_11, 11,
+                    SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_11, 0,
                     test_result, "response dup dhe_named_group - 0x%02x", struct_table->alg_type);
             }
             dhe_named_group_is_found = true;
@@ -1282,7 +1046,7 @@ void spdm_test_case_algorithms_success_11 (void *test_context)
                 test_result = COMMON_TEST_RESULT_FAIL;
                 common_test_record_test_assertion (
                     SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-                    SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_11, 11,
+                    SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_11, 0,
                     test_result, "response dup aead_cipher_suite - 0x%02x", struct_table->alg_type);
             }
             aead_cipher_suite_is_found = true;
@@ -1296,7 +1060,7 @@ void spdm_test_case_algorithms_success_11 (void *test_context)
                 test_result = COMMON_TEST_RESULT_FAIL;
                 common_test_record_test_assertion (
                     SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-                    SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_11, 11,
+                    SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_11, 0,
                     test_result, "response dup req_base_asym_alg - 0x%02x", struct_table->alg_type);
             }
             req_base_asym_alg_is_found = true;
@@ -1316,18 +1080,18 @@ void spdm_test_case_algorithms_success_11 (void *test_context)
                 test_result = COMMON_TEST_RESULT_FAIL;
                 common_test_record_test_assertion (
                     SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-                    SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_11, 11,
+                    SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_11, 0,
                     test_result, "response dup key_schedule - 0x%02x", struct_table->alg_type);
             }
             key_schedule_is_found = true;
             key_schedule = (uint16_t)spdm_test_get_one_bit (struct_table->alg_supported,
-                                                            SPDM_ALGORITHMS_KEY_SCHEDULE_HMAC_HASH);
+                                                            SPDM_ALGORITHMS_KEY_SCHEDULE_SPDM);
             break;
         default:
             test_result = COMMON_TEST_RESULT_FAIL;
             common_test_record_test_assertion (
                 SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-                SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_11, 11,
+                SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_11, 0,
                 test_result, "response unknown alg_type - 0x%02x", struct_table->alg_type);
             break;
         }
@@ -1410,7 +1174,7 @@ void spdm_test_case_algorithms_success_11 (void *test_context)
         test_result, "response key_schedule - 0x%04x", key_schedule);
 }
 
-void spdm_test_case_algorithms_success_12 (void *test_context)
+void spdm_test_case_algorithms_success_12_13 (void *test_context, uint32_t spdm_version)
 {
     spdm_test_context_t *spdm_test_context;
     void *spdm_context;
@@ -1434,6 +1198,20 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
     size_t index;
     uint8_t ext_alg_count;
 
+    uint32_t test_version = 0;
+    uint32_t message_version = spdm_version >> SPDM_VERSION_NUMBER_SHIFT_BIT;
+
+    switch (message_version) {
+        case SPDM_MESSAGE_VERSION_12:
+            test_version = SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12;
+            break;
+        case SPDM_MESSAGE_VERSION_13:
+            test_version = SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_13;
+            break;
+        default:
+            return;
+    }           
+
     dhe_named_group = 0;
     aead_cipher_suite = 0;
     req_base_asym_alg = 0;
@@ -1446,7 +1224,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
                     sizeof(spdm_algorithms_test_buffer_t));
 
     libspdm_zero_mem(&spdm_request, sizeof(spdm_request));
-    spdm_request.header.spdm_version = SPDM_MESSAGE_VERSION_12;
+    spdm_request.header.spdm_version = (message_version & 0xFF);
     spdm_request.length = sizeof(spdm_request);
     spdm_request.header.param1 = 4;
     spdm_request.header.request_response_code = SPDM_NEGOTIATE_ALGORITHMS;
@@ -1518,7 +1296,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
     spdm_request.struct_table[3].alg_type =
         SPDM_NEGOTIATE_ALGORITHMS_STRUCT_TABLE_ALG_TYPE_KEY_SCHEDULE;
     spdm_request.struct_table[3].alg_count = 0x20;
-    spdm_request.struct_table[3].alg_supported = SPDM_ALGORITHMS_KEY_SCHEDULE_HMAC_HASH;
+    spdm_request.struct_table[3].alg_supported = SPDM_ALGORITHMS_KEY_SCHEDULE_SPDM;
 
     spdm_response = (void *)message;
     spdm_response_size = sizeof(message);
@@ -1528,8 +1306,8 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
                                        spdm_response, &spdm_response_size);
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
-            SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_11,
-            COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version,
+            0,
             COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
         return;
     }
@@ -1540,7 +1318,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
         test_result = COMMON_TEST_RESULT_FAIL;
     }
     common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 1,
+        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 1,
         test_result, "response size - %d", spdm_response_size);
     if (test_result == COMMON_TEST_RESULT_FAIL) {
         return;
@@ -1552,19 +1330,19 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
         test_result = COMMON_TEST_RESULT_FAIL;
     }
     common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 2,
+        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 2,
         test_result, "response code - 0x%02x", spdm_response->header.request_response_code);
     if (test_result == COMMON_TEST_RESULT_FAIL) {
         return;
     }
 
-    if (spdm_response->header.spdm_version == SPDM_MESSAGE_VERSION_12) {
+    if (spdm_response->header.spdm_version == message_version) {
         test_result = COMMON_TEST_RESULT_PASS;
     } else {
         test_result = COMMON_TEST_RESULT_FAIL;
     }
     common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 3,
+        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 3,
         test_result, "response version - 0x%02x", spdm_response->header.spdm_version);
     if (test_result == COMMON_TEST_RESULT_FAIL) {
         return;
@@ -1580,7 +1358,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
         test_result = COMMON_TEST_RESULT_FAIL;
     }
     common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 4,
+        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 4,
         test_result, "response length - 0x%04x", spdm_response->length);
     if (test_result == COMMON_TEST_RESULT_FAIL) {
         return;
@@ -1592,7 +1370,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
         test_result = COMMON_TEST_RESULT_FAIL;
     }
     common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 5,
+        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 5,
         test_result, "response ext_asym_sel_count - 0x%02x", spdm_response->ext_asym_sel_count);
     if (test_result == COMMON_TEST_RESULT_FAIL) {
         return;
@@ -1604,7 +1382,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
         test_result = COMMON_TEST_RESULT_FAIL;
     }
     common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 6,
+        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 6,
         test_result, "response ext_hash_sel_count - 0x%02x", spdm_response->ext_hash_sel_count);
     if (test_result == COMMON_TEST_RESULT_FAIL) {
         return;
@@ -1618,7 +1396,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
         test_result = COMMON_TEST_RESULT_FAIL;
     }
     common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 7,
+        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 7,
         test_result, "response measurement_specification_sel - 0x%02x",
         spdm_response->measurement_specification_sel);
 
@@ -1642,7 +1420,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
         test_result = COMMON_TEST_RESULT_FAIL;
     }
     common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 8,
+        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 8,
         test_result, "response measurement_hash_algo - 0x%08x",
         spdm_response->measurement_hash_algo);
 
@@ -1676,7 +1454,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
         test_result = COMMON_TEST_RESULT_FAIL;
     }
     common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 9,
+        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 9,
         test_result, "response base_asym_sel - 0x%08x", spdm_response->base_asym_sel);
 
     algo = spdm_test_get_one_bit (spdm_response->base_hash_sel,
@@ -1707,7 +1485,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
         test_result = COMMON_TEST_RESULT_FAIL;
     }
     common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 10,
+        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 10,
         test_result, "response base_hash_sel - 0x%08x", spdm_response->base_hash_sel);
 
     if (spdm_response->header.param1 <= 4) {
@@ -1716,7 +1494,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
         test_result = COMMON_TEST_RESULT_FAIL;
     }
     common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 11,
+        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 11,
         test_result, "response param1 - 0x%02x", spdm_response->header.param1);
 
     dhe_named_group_is_found = false;
@@ -1734,7 +1512,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
                 test_result = COMMON_TEST_RESULT_FAIL;
                 common_test_record_test_assertion (
                     SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-                    SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 11,
+                    test_version, 0,
                     test_result, "response dup dhe_named_group - 0x%02x", struct_table->alg_type);
             }
             dhe_named_group_is_found = true;
@@ -1751,8 +1529,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
             if (aead_cipher_suite_is_found) {
                 test_result = COMMON_TEST_RESULT_FAIL;
                 common_test_record_test_assertion (
-                    SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-                    SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 11,
+                    SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 0,
                     test_result, "response dup aead_cipher_suite - 0x%02x", struct_table->alg_type);
             }
             aead_cipher_suite_is_found = true;
@@ -1766,8 +1543,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
             if (req_base_asym_alg_is_found) {
                 test_result = COMMON_TEST_RESULT_FAIL;
                 common_test_record_test_assertion (
-                    SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-                    SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 11,
+                    SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 0,
                     test_result, "response dup req_base_asym_alg - 0x%02x", struct_table->alg_type);
             }
             req_base_asym_alg_is_found = true;
@@ -1789,19 +1565,17 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
             if (key_schedule_is_found) {
                 test_result = COMMON_TEST_RESULT_FAIL;
                 common_test_record_test_assertion (
-                    SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-                    SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 11,
+                    SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 0,
                     test_result, "response dup key_schedule - 0x%02x", struct_table->alg_type);
             }
             key_schedule_is_found = true;
             key_schedule = (uint16_t)spdm_test_get_one_bit (struct_table->alg_supported,
-                                                            SPDM_ALGORITHMS_KEY_SCHEDULE_HMAC_HASH);
+                                                            SPDM_ALGORITHMS_KEY_SCHEDULE_SPDM);
             break;
         default:
             test_result = COMMON_TEST_RESULT_FAIL;
             common_test_record_test_assertion (
-                SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
-                SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 11,
+                SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 0,
                 test_result, "response unknown alg_type - 0x%02x", struct_table->alg_type);
             break;
         }
@@ -1811,8 +1585,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
             test_result = COMMON_TEST_RESULT_FAIL;
         }
         common_test_record_test_assertion (
-            SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12,
-            12,
+            SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 12,
             test_result, "response alg_count - 0x%02x", struct_table->alg_count);
         ext_alg_count = struct_table->alg_count & 0xF;
         struct_table =
@@ -1832,7 +1605,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
         test_result = COMMON_TEST_RESULT_FAIL;
     }
     common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 13,
+        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 13,
         test_result, "response dhe_named_group - 0x%04x", dhe_named_group);
 
     if ((((test_buffer->rsp_cap_flags & SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_KEY_EX_CAP) != 0) ||
@@ -1849,7 +1622,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
         test_result = COMMON_TEST_RESULT_FAIL;
     }
     common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 14,
+        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 14,
         test_result, "response aead_cipher_suite - 0x%04x", aead_cipher_suite);
 
     if (((test_buffer->rsp_cap_flags & SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_MUT_AUTH_CAP) != 0) &&
@@ -1863,7 +1636,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
         test_result = COMMON_TEST_RESULT_FAIL;
     }
     common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 15,
+        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 15,
         test_result, "response req_base_asym_alg - 0x%04x", req_base_asym_alg);
 
     if ((((test_buffer->rsp_cap_flags & SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_KEY_EX_CAP) != 0) ||
@@ -1880,7 +1653,7 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
         test_result = COMMON_TEST_RESULT_FAIL;
     }
     common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12, 16,
+        SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 16,
         test_result, "response key_schedule - 0x%04x", key_schedule);
 
     spdm_response->other_params_selection = SPDM_ALGORITHMS_OPAQUE_DATA_FORMAT_1;
@@ -1893,11 +1666,20 @@ void spdm_test_case_algorithms_success_12 (void *test_context)
             test_result = COMMON_TEST_RESULT_FAIL;
         }
         common_test_record_test_assertion (
-            SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_12,
-            17,
+            SPDM_RESPONDER_TEST_GROUP_ALGORITHMS, test_version, 17,
             test_result, "response other_params_selection - 0x%02x",
             spdm_response->other_params_selection);
     }
+}
+
+void spdm_test_case_algorithms_success_12 (void *test_context)
+{
+    spdm_test_case_algorithms_success_12_13(test_context, SPDM_MESSAGE_VERSION_12 << SPDM_VERSION_NUMBER_SHIFT_BIT);
+}
+
+void spdm_test_case_algorithms_success_13 (void *test_context)
+{
+    spdm_test_case_algorithms_success_12_13(test_context, SPDM_MESSAGE_VERSION_13 << SPDM_VERSION_NUMBER_SHIFT_BIT);
 }
 
 void spdm_test_case_algorithms_unexpected_non_identical (void *test_context)
@@ -2022,7 +1804,7 @@ void spdm_test_case_algorithms_unexpected_non_identical (void *test_context)
     spdm_request.struct_table[3].alg_type =
         SPDM_NEGOTIATE_ALGORITHMS_STRUCT_TABLE_ALG_TYPE_KEY_SCHEDULE;
     spdm_request.struct_table[3].alg_count = 0x20;
-    spdm_request.struct_table[3].alg_supported = SPDM_ALGORITHMS_KEY_SCHEDULE_HMAC_HASH;
+    spdm_request.struct_table[3].alg_supported = SPDM_ALGORITHMS_KEY_SCHEDULE_SPDM;
 
     spdm_response = (void *)message;
     spdm_response_size = sizeof(message);
@@ -2034,7 +1816,7 @@ void spdm_test_case_algorithms_unexpected_non_identical (void *test_context)
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
             SPDM_RESPONDER_TEST_CASE_ALGORITHMS_UNEXPECTED_REQUEST_NON_IDENTICAL,
-            COMMON_TEST_ID_END,
+            0,
             COMMON_TEST_RESULT_NOT_TESTED, "First send/receive failure");
         return;
     }
@@ -2042,7 +1824,7 @@ void spdm_test_case_algorithms_unexpected_non_identical (void *test_context)
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
             SPDM_RESPONDER_TEST_CASE_ALGORITHMS_UNEXPECTED_REQUEST_NON_IDENTICAL,
-            COMMON_TEST_ID_END,
+            0,
             COMMON_TEST_RESULT_NOT_TESTED, "First NEGOTIATE_ALGORITHMS failure");
         return;
     }
@@ -2119,7 +1901,7 @@ void spdm_test_case_algorithms_unexpected_non_identical (void *test_context)
             common_test_record_test_assertion (
                 SPDM_RESPONDER_TEST_GROUP_ALGORITHMS,
                 SPDM_RESPONDER_TEST_CASE_ALGORITHMS_UNEXPECTED_REQUEST_NON_IDENTICAL,
-                COMMON_TEST_ID_END,
+                0,
                 COMMON_TEST_RESULT_NOT_TESTED, "Second send/receive failure");
             continue;
         }
@@ -2199,11 +1981,6 @@ common_test_case_t m_spdm_test_group_algorithms[] = {
      spdm_test_case_algorithms_version_mismatch,
      spdm_test_case_algorithms_setup_version_any,
      spdm_test_case_common_teardown},
-    {SPDM_RESPONDER_TEST_CASE_ALGORITHMS_UNEXPECTED_REQUEST,
-     "spdm_test_case_algorithms_unexpected_request",
-     spdm_test_case_algorithms_unexpected_request,
-     spdm_test_case_algorithms_setup_version_only,
-     spdm_test_case_common_teardown},
     {SPDM_RESPONDER_TEST_CASE_ALGORITHMS_INVALID_REQUEST,
      "spdm_test_case_algorithms_invalid_request",
      spdm_test_case_algorithms_invalid_request,
@@ -2223,6 +2000,11 @@ common_test_case_t m_spdm_test_group_algorithms[] = {
      "spdm_test_case_algorithms_unexpected_non_identical",
      spdm_test_case_algorithms_unexpected_non_identical,
      spdm_test_case_algorithms_setup_version_any,
+     spdm_test_case_common_teardown},
+    {SPDM_RESPONDER_TEST_CASE_ALGORITHMS_SUCCESS_13,
+     "spdm_test_case_algorithms_success_13",
+     spdm_test_case_algorithms_success_13,
+     spdm_test_case_algorithms_setup_version_13,
      spdm_test_case_common_teardown},
     {COMMON_TEST_ID_END, NULL, NULL},
 };

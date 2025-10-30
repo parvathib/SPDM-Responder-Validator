@@ -1,7 +1,7 @@
 /**
  *  Copyright Notice:
  *  Copyright 2021 DMTF. All rights reserved.
- *  License: BSD 3-Clause License. For full text see link: https://github.com/DMTF/spdm-emu/blob/main/LICENSE.md
+ *  License: BSD 3-Clause License. For full text see link: https://github.com/DMTF/SPDM-Responder-Validator/blob/main/LICENSE.md
  **/
 
 #include "spdm_responder_test.h"
@@ -122,7 +122,7 @@ bool spdm_test_case_finish_rsp_setup_vca_digest (void *test_context,
              SPDM_ALGORITHMS_BASE_ASYM_ALGO_EDDSA_ED448;
     libspdm_set_data(spdm_context, LIBSPDM_DATA_REQ_BASE_ASYM_ALG, &parameter,
                      &data16, sizeof(data16));
-    data16 = SPDM_ALGORITHMS_KEY_SCHEDULE_HMAC_HASH;
+    data16 = SPDM_ALGORITHMS_KEY_SCHEDULE_SPDM;
     libspdm_set_data(spdm_context, LIBSPDM_DATA_KEY_SCHEDULE, &parameter, &data16,
                      sizeof(data16));
     data8 = SPDM_ALGORITHMS_OPAQUE_DATA_FORMAT_1;
@@ -245,73 +245,6 @@ bool spdm_test_case_finish_rsp_setup_version_12_hs_clear (void *test_context)
                                                            spdm_version), spdm_version, true);
 }
 
-bool spdm_test_case_finish_rsp_setup_version_capabilities (void *test_context)
-{
-    spdm_test_context_t *spdm_test_context;
-    void *spdm_context;
-    libspdm_return_t status;
-    libspdm_data_parameter_t parameter;
-    size_t data_size;
-    spdm_version_number_t spdm_version;
-    spdm_finish_rsp_test_buffer_t *test_buffer;
-    uint32_t data32;
-
-    spdm_test_context = test_context;
-    spdm_context = spdm_test_context->spdm_context;
-
-    libspdm_zero_mem(&parameter, sizeof(parameter));
-    parameter.location = LIBSPDM_DATA_LOCATION_LOCAL;
-    /*set capability to support key_exchange*/
-    data32 = SPDM_GET_CAPABILITIES_REQUEST_FLAGS_CERT_CAP |
-             SPDM_GET_CAPABILITIES_REQUEST_FLAGS_CHAL_CAP |
-             SPDM_GET_CAPABILITIES_REQUEST_FLAGS_ENCRYPT_CAP |
-             SPDM_GET_CAPABILITIES_REQUEST_FLAGS_MAC_CAP |
-             SPDM_GET_CAPABILITIES_REQUEST_FLAGS_KEY_EX_CAP |
-             SPDM_GET_CAPABILITIES_REQUEST_FLAGS_ENCAP_CAP |
-             SPDM_GET_CAPABILITIES_REQUEST_FLAGS_HBEAT_CAP |
-             SPDM_GET_CAPABILITIES_REQUEST_FLAGS_KEY_UPD_CAP;
-    libspdm_set_data(spdm_context, LIBSPDM_DATA_CAPABILITY_FLAGS, &parameter,
-                     &data32, sizeof(data32));
-
-    status = libspdm_get_version (spdm_context, NULL, NULL);
-    if (LIBSPDM_STATUS_IS_ERROR(status)) {
-        return false;
-    }
-
-    status = libspdm_get_capabilities (spdm_context);
-    if (LIBSPDM_STATUS_IS_ERROR(status)) {
-        return false;
-    }
-
-    test_buffer = (void *)spdm_test_context->test_scratch_buffer;
-    LIBSPDM_ASSERT(sizeof(spdm_test_context->test_scratch_buffer) >=
-                   sizeof(spdm_finish_rsp_test_buffer_t));
-    libspdm_zero_mem(test_buffer, sizeof(spdm_finish_rsp_test_buffer_t));
-    spdm_test_context->test_scratch_buffer_size = sizeof(spdm_finish_rsp_test_buffer_t);
-
-    data_size = sizeof(test_buffer->rsp_cap_flags);
-    libspdm_zero_mem(&parameter, sizeof(parameter));
-    parameter.location = LIBSPDM_DATA_LOCATION_CONNECTION;
-    libspdm_get_data(spdm_context, LIBSPDM_DATA_CAPABILITY_FLAGS, &parameter,
-                     &test_buffer->rsp_cap_flags, &data_size);
-    if (((test_buffer->rsp_cap_flags & SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_CERT_CAP) == 0) ||
-        ((test_buffer->rsp_cap_flags & SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_KEY_EX_CAP) == 0)) {
-        return false;
-    }
-
-    spdm_version = 0;
-    data_size = sizeof(spdm_version);
-    libspdm_zero_mem(&parameter, sizeof(parameter));
-    parameter.location = LIBSPDM_DATA_LOCATION_CONNECTION;
-    libspdm_get_data(spdm_context, LIBSPDM_DATA_SPDM_VERSION, &parameter, &spdm_version,
-                     &data_size);
-    test_buffer->version = (spdm_version >> SPDM_VERSION_NUMBER_SHIFT_BIT);
-
-    spdm_test_context->test_scratch_buffer_size = sizeof(test_buffer->version);
-
-    return true;
-}
-
 void spdm_test_case_finish_rsp_success_11_12 (void *test_context, uint8_t version, bool hs_clear)
 {
     spdm_test_context_t *spdm_test_context;
@@ -373,7 +306,7 @@ void spdm_test_case_finish_rsp_success_11_12 (void *test_context, uint8_t versio
         status = libspdm_init_connection (spdm_context, false);
         if (LIBSPDM_STATUS_IS_ERROR(status)) {
             common_test_record_test_assertion (
-                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "init_connection failure");
             continue;
         }
@@ -383,7 +316,7 @@ void spdm_test_case_finish_rsp_success_11_12 (void *test_context, uint8_t versio
                                           &m_cert_chain_buffer_size, m_cert_chain_buffer);
         if (LIBSPDM_STATUS_IS_ERROR(status)) {
             common_test_record_test_assertion (
-                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "get_certificate failure");
             continue;
         }
@@ -394,7 +327,7 @@ void spdm_test_case_finish_rsp_success_11_12 (void *test_context, uint8_t versio
                                                     NULL);
         if (LIBSPDM_STATUS_IS_ERROR(status)) {
             common_test_record_test_assertion (
-                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "key_exchange failure");
             continue;
         }
@@ -414,7 +347,7 @@ void spdm_test_case_finish_rsp_success_11_12 (void *test_context, uint8_t versio
                                           sizeof(spdm_finish_request_t));
         if (LIBSPDM_STATUS_IS_ERROR(status)) {
             common_test_record_test_assertion (
-                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "append_message_f failure");
             continue;
         }
@@ -422,7 +355,7 @@ void spdm_test_case_finish_rsp_success_11_12 (void *test_context, uint8_t versio
         result = libspdm_generate_finish_req_hmac(spdm_context, session_info, ptr);
         if (!result) {
             common_test_record_test_assertion (
-                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "generate_finish_req_hmac failure");
             continue;
         }
@@ -430,7 +363,7 @@ void spdm_test_case_finish_rsp_success_11_12 (void *test_context, uint8_t versio
                                           test_buffer->hash_size);
         if (LIBSPDM_STATUS_IS_ERROR(status)) {
             common_test_record_test_assertion (
-                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "append_message_f failure");
             continue;
         }
@@ -451,7 +384,7 @@ void spdm_test_case_finish_rsp_success_11_12 (void *test_context, uint8_t versio
         }
         if (LIBSPDM_STATUS_IS_ERROR(status)) {
             common_test_record_test_assertion (
-                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
             return;
         }
@@ -501,7 +434,7 @@ void spdm_test_case_finish_rsp_success_11_12 (void *test_context, uint8_t versio
                                           sizeof(spdm_finish_response_t));
         if (LIBSPDM_STATUS_IS_ERROR(status)) {
             common_test_record_test_assertion (
-                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "append_message_k failure");
             return;
         }
@@ -524,7 +457,7 @@ void spdm_test_case_finish_rsp_success_11_12 (void *test_context, uint8_t versio
                                               test_buffer->hash_size);
             if (LIBSPDM_STATUS_IS_ERROR(status)) {
                 common_test_record_test_assertion (
-                    SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, COMMON_TEST_ID_END,
+                    SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, 0,
                     COMMON_TEST_RESULT_NOT_TESTED, "append_message_f failure");
                 return;
             }
@@ -534,7 +467,7 @@ void spdm_test_case_finish_rsp_success_11_12 (void *test_context, uint8_t versio
                                             th2_hash_data);
         if (!result) {
             common_test_record_test_assertion (
-                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "calculate_th2_hash failure");
             return;
         }
@@ -582,10 +515,7 @@ void spdm_test_case_finish_rsp_version_mismatch (void *test_context)
     bool result;
     common_test_result_t test_result;
     spdm_finish_rsp_test_buffer_t *test_buffer;
-    uint8_t mismatched_version[] = {
-        SPDM_MESSAGE_VERSION_10 - 1,
-        SPDM_MESSAGE_VERSION_12 + 1,
-    };
+    uint8_t mismatched_version[2];
     size_t index;
 
     spdm_test_context = test_context;
@@ -604,7 +534,7 @@ void spdm_test_case_finish_rsp_version_mismatch (void *test_context)
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_VERSION_MISMATCH, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_VERSION_MISMATCH, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "key_exchange failure");
         return;
     }
@@ -629,7 +559,7 @@ void spdm_test_case_finish_rsp_version_mismatch (void *test_context)
         if (LIBSPDM_STATUS_IS_ERROR(status)) {
             common_test_record_test_assertion (
                 SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-                SPDM_RESPONDER_TEST_CASE_FINISH_RSP_VERSION_MISMATCH, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_CASE_FINISH_RSP_VERSION_MISMATCH, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "append_message_f failure");
             continue;
         }
@@ -638,7 +568,7 @@ void spdm_test_case_finish_rsp_version_mismatch (void *test_context)
         if (!result) {
             common_test_record_test_assertion (
                 SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-                SPDM_RESPONDER_TEST_CASE_FINISH_RSP_VERSION_MISMATCH, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_CASE_FINISH_RSP_VERSION_MISMATCH, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "generate_finish_req_hmac failure");
             continue;
         }
@@ -647,7 +577,7 @@ void spdm_test_case_finish_rsp_version_mismatch (void *test_context)
         if (LIBSPDM_STATUS_IS_ERROR(status)) {
             common_test_record_test_assertion (
                 SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-                SPDM_RESPONDER_TEST_CASE_FINISH_RSP_VERSION_MISMATCH, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_CASE_FINISH_RSP_VERSION_MISMATCH, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "append_message_f failure");
             continue;
         }
@@ -663,7 +593,7 @@ void spdm_test_case_finish_rsp_version_mismatch (void *test_context)
         if (LIBSPDM_STATUS_IS_ERROR(status)) {
             common_test_record_test_assertion (
                 SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-                SPDM_RESPONDER_TEST_CASE_FINISH_RSP_VERSION_MISMATCH, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_CASE_FINISH_RSP_VERSION_MISMATCH, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
             continue;
         }
@@ -729,110 +659,6 @@ void spdm_test_case_finish_rsp_version_mismatch (void *test_context)
     }
 }
 
-void spdm_test_case_finish_rsp_unexpected_request (void *test_context)
-{
-    spdm_test_context_t *spdm_test_context;
-    void *spdm_context;
-    libspdm_return_t status;
-    spdm_finish_request_mine_t spdm_request;
-    size_t spdm_request_size;
-    spdm_finish_response_t *spdm_response;
-    size_t spdm_response_size;
-    uint8_t message[LIBSPDM_MAX_SPDM_MSG_SIZE];
-    common_test_result_t test_result;
-    spdm_finish_rsp_test_buffer_t *test_buffer;
-
-    spdm_test_context = test_context;
-    spdm_context = spdm_test_context->spdm_context;
-    test_buffer = (void *)spdm_test_context->test_scratch_buffer;
-    LIBSPDM_ASSERT(spdm_test_context->test_scratch_buffer_size ==
-                   sizeof(test_buffer->version));
-
-    libspdm_zero_mem(&spdm_request, sizeof(spdm_request));
-    spdm_request.header.spdm_version = test_buffer->version;
-    spdm_request.header.request_response_code = SPDM_FINISH;
-    spdm_request.header.param1 = 0;
-    spdm_request.header.param2 = 0;
-
-    spdm_request_size = sizeof(spdm_finish_request_t) + test_buffer->hash_size;
-
-    spdm_response = (void *)message;
-    spdm_response_size = sizeof(message);
-    libspdm_zero_mem(message, sizeof(message));
-    status = libspdm_send_receive_data(spdm_context, NULL, false,
-                                       &spdm_request, spdm_request_size,
-                                       spdm_response, &spdm_response_size);
-    if (LIBSPDM_STATUS_IS_ERROR(status)) {
-        common_test_record_test_assertion (
-            SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST, COMMON_TEST_ID_END,
-            COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
-        return;
-    }
-
-    if (spdm_response_size >= sizeof(spdm_error_response_t)) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-        SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST, 1,
-        test_result, "response size - %d", spdm_response_size);
-    if (test_result == COMMON_TEST_RESULT_FAIL) {
-        return;
-    }
-
-    if (spdm_response->header.request_response_code == SPDM_ERROR) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-        SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST, 2,
-        test_result, "response code - 0x%02x", spdm_response->header.request_response_code);
-    if (test_result == COMMON_TEST_RESULT_FAIL) {
-        return;
-    }
-
-    if (spdm_response->header.spdm_version == test_buffer->version) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-        SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST, 3,
-        test_result, "response version - 0x%02x", spdm_response->header.spdm_version);
-    if (test_result == COMMON_TEST_RESULT_FAIL) {
-        return;
-    }
-
-    if (spdm_response->header.param1 == SPDM_ERROR_CODE_UNEXPECTED_REQUEST) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-        SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST, 4,
-        test_result, "response param1 - 0x%02x", spdm_response->header.param1);
-    if (test_result == COMMON_TEST_RESULT_FAIL) {
-        return;
-    }
-
-    if (spdm_response->header.param2 == 0) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-        SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST, 5,
-        test_result, "response param2 - 0x%02x", spdm_response->header.param2);
-}
-
 void spdm_test_case_finish_rsp_unexpected_request_in_session (void *test_context)
 {
     spdm_test_context_t *spdm_test_context;
@@ -863,7 +689,7 @@ void spdm_test_case_finish_rsp_unexpected_request_in_session (void *test_context
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST_IN_SESSION, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST_IN_SESSION, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "start_session failure");
         return;
     }
@@ -883,7 +709,7 @@ void spdm_test_case_finish_rsp_unexpected_request_in_session (void *test_context
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST_IN_SESSION, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST_IN_SESSION, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "append_message_f failure");
         return;
     }
@@ -892,7 +718,7 @@ void spdm_test_case_finish_rsp_unexpected_request_in_session (void *test_context
     if (!result) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST_IN_SESSION, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST_IN_SESSION, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "generate_finish_req_hmac failure");
         return;
     }
@@ -901,7 +727,7 @@ void spdm_test_case_finish_rsp_unexpected_request_in_session (void *test_context
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST_IN_SESSION, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST_IN_SESSION, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "append_message_f failure");
         return;
     }
@@ -917,7 +743,7 @@ void spdm_test_case_finish_rsp_unexpected_request_in_session (void *test_context
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST_IN_SESSION, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST_IN_SESSION, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
         return;
     }
@@ -1019,7 +845,7 @@ void spdm_test_case_finish_rsp_invalid_request (void *test_context)
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_INVALID_REQUEST, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_INVALID_REQUEST, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "key_exchange failure");
         return;
     }
@@ -1039,7 +865,7 @@ void spdm_test_case_finish_rsp_invalid_request (void *test_context)
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_INVALID_REQUEST, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_INVALID_REQUEST, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "append_message_f failure");
         return;
     }
@@ -1048,7 +874,7 @@ void spdm_test_case_finish_rsp_invalid_request (void *test_context)
     if (!result) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_INVALID_REQUEST, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_INVALID_REQUEST, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "generate_finish_req_hmac failure");
         return;
     }
@@ -1057,7 +883,7 @@ void spdm_test_case_finish_rsp_invalid_request (void *test_context)
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_INVALID_REQUEST, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_INVALID_REQUEST, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "append_message_f failure");
         return;
     }
@@ -1090,7 +916,7 @@ void spdm_test_case_finish_rsp_invalid_request (void *test_context)
         if (LIBSPDM_STATUS_IS_ERROR(status)) {
             common_test_record_test_assertion (
                 SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-                SPDM_RESPONDER_TEST_CASE_FINISH_RSP_INVALID_REQUEST, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_CASE_FINISH_RSP_INVALID_REQUEST, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
             continue;
         }
@@ -1195,7 +1021,7 @@ void spdm_test_case_finish_rsp_decrypt_error_invalid_verify_data_common (void *t
                                                 0, 0, &session_id, NULL, &req_slot_id_param, NULL);
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
-            SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "key_exchange failure");
         return;
     }
@@ -1214,7 +1040,7 @@ void spdm_test_case_finish_rsp_decrypt_error_invalid_verify_data_common (void *t
                                       sizeof(spdm_finish_request_t));
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
-            SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "append_message_f failure");
         return;
     }
@@ -1222,7 +1048,7 @@ void spdm_test_case_finish_rsp_decrypt_error_invalid_verify_data_common (void *t
     result = libspdm_generate_finish_req_hmac(spdm_context, session_info, ptr);
     if (!result) {
         common_test_record_test_assertion (
-            SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "generate_finish_req_hmac failure");
         return;
     }
@@ -1233,7 +1059,7 @@ void spdm_test_case_finish_rsp_decrypt_error_invalid_verify_data_common (void *t
                                       test_buffer->hash_size);
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
-            SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "append_message_f failure");
         return;
     }
@@ -1254,7 +1080,7 @@ void spdm_test_case_finish_rsp_decrypt_error_invalid_verify_data_common (void *t
     }
     if (LIBSPDM_STATUS_IS_ERROR(status) && (status != LIBSPDM_STATUS_SESSION_MSG_ERROR)) {
         common_test_record_test_assertion (
-            SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_GROUP_FINISH_RSP, case_id, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
         return;
     }
@@ -1362,7 +1188,7 @@ void spdm_test_case_finish_rsp_session_required (void *test_context)
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_SESSION_REQUIRED, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_SESSION_REQUIRED, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "key_exchange failure");
         return;
     }
@@ -1382,7 +1208,7 @@ void spdm_test_case_finish_rsp_session_required (void *test_context)
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_SESSION_REQUIRED, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_SESSION_REQUIRED, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "append_message_f failure");
         return;
     }
@@ -1391,7 +1217,7 @@ void spdm_test_case_finish_rsp_session_required (void *test_context)
     if (!result) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_SESSION_REQUIRED, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_SESSION_REQUIRED, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "generate_finish_req_hmac failure");
         return;
     }
@@ -1400,7 +1226,7 @@ void spdm_test_case_finish_rsp_session_required (void *test_context)
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_SESSION_REQUIRED, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_SESSION_REQUIRED, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "append_message_f failure");
         return;
     }
@@ -1416,7 +1242,7 @@ void spdm_test_case_finish_rsp_session_required (void *test_context)
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_FINISH_RSP,
-            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_SESSION_REQUIRED, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_FINISH_RSP_SESSION_REQUIRED, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
         return;
     }
@@ -1486,11 +1312,6 @@ common_test_case_t m_spdm_test_group_finish_rsp[] = {
      "spdm_test_case_finish_rsp_version_mismatch",
      spdm_test_case_finish_rsp_version_mismatch,
      spdm_test_case_finish_rsp_setup_version_any,
-     spdm_test_case_common_teardown},
-    {SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST,
-     "spdm_test_case_finish_rsp_unexpected_request",
-     spdm_test_case_finish_rsp_unexpected_request,
-     spdm_test_case_finish_rsp_setup_version_capabilities,
      spdm_test_case_common_teardown},
     {SPDM_RESPONDER_TEST_CASE_FINISH_RSP_UNEXPECTED_REQUEST_IN_SESSION,
      "spdm_test_case_finish_rsp_unexpected_request_in_session",

@@ -1,7 +1,7 @@
 /**
  *  Copyright Notice:
  *  Copyright 2021 DMTF. All rights reserved.
- *  License: BSD 3-Clause License. For full text see link: https://github.com/DMTF/spdm-emu/blob/main/LICENSE.md
+ *  License: BSD 3-Clause License. For full text see link: https://github.com/DMTF/SPDM-Responder-Validator/blob/main/LICENSE.md
  **/
 
 #include "spdm_responder_test.h"
@@ -105,7 +105,7 @@ bool spdm_test_case_digests_setup_vca (void *test_context,
              SPDM_ALGORITHMS_BASE_ASYM_ALGO_EDDSA_ED448;
     libspdm_set_data(spdm_context, LIBSPDM_DATA_REQ_BASE_ASYM_ALG, &parameter,
                      &data16, sizeof(data16));
-    data16 = SPDM_ALGORITHMS_KEY_SCHEDULE_HMAC_HASH;
+    data16 = SPDM_ALGORITHMS_KEY_SCHEDULE_SPDM;
     libspdm_set_data(spdm_context, LIBSPDM_DATA_KEY_SCHEDULE, &parameter, &data16,
                      sizeof(data16));
     data8 = SPDM_ALGORITHMS_OPAQUE_DATA_FORMAT_1;
@@ -154,59 +154,6 @@ bool spdm_test_case_digests_setup_version_any (void *test_context)
     return spdm_test_case_digests_setup_vca (test_context, 0);
 }
 
-bool spdm_test_case_digests_setup_version_capabilities (void *test_context)
-{
-    spdm_test_context_t *spdm_test_context;
-    void *spdm_context;
-    libspdm_return_t status;
-    libspdm_data_parameter_t parameter;
-    uint32_t rsp_cap_flags;
-    size_t data_size;
-    spdm_version_number_t spdm_version;
-    spdm_digests_test_buffer_t *test_buffer;
-
-    spdm_test_context = test_context;
-    spdm_context = spdm_test_context->spdm_context;
-
-    status = libspdm_get_version (spdm_context, NULL, NULL);
-    if (LIBSPDM_STATUS_IS_ERROR(status)) {
-        return false;
-    }
-
-    status = libspdm_get_capabilities (spdm_context);
-    if (LIBSPDM_STATUS_IS_ERROR(status)) {
-        return false;
-    }
-
-    rsp_cap_flags = 0;
-    data_size = sizeof(rsp_cap_flags);
-    libspdm_zero_mem(&parameter, sizeof(parameter));
-    parameter.location = LIBSPDM_DATA_LOCATION_CONNECTION;
-    libspdm_get_data(spdm_context, LIBSPDM_DATA_CAPABILITY_FLAGS, &parameter, &rsp_cap_flags,
-                     &data_size);
-    if ((rsp_cap_flags & SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_CERT_CAP) == 0) {
-        return false;
-    }
-
-    test_buffer = (void *)spdm_test_context->test_scratch_buffer;
-    LIBSPDM_ASSERT(sizeof(spdm_test_context->test_scratch_buffer) >=
-                   sizeof(spdm_digests_test_buffer_t));
-    libspdm_zero_mem(test_buffer, sizeof(spdm_digests_test_buffer_t));
-    spdm_test_context->test_scratch_buffer_size = sizeof(spdm_digests_test_buffer_t);
-
-    spdm_version = 0;
-    data_size = sizeof(spdm_version);
-    libspdm_zero_mem(&parameter, sizeof(parameter));
-    parameter.location = LIBSPDM_DATA_LOCATION_CONNECTION;
-    libspdm_get_data(spdm_context, LIBSPDM_DATA_SPDM_VERSION, &parameter, &spdm_version,
-                     &data_size);
-    test_buffer->version = (spdm_version >> SPDM_VERSION_NUMBER_SHIFT_BIT);
-
-    spdm_test_context->test_scratch_buffer_size = sizeof(test_buffer->version);
-
-    return true;
-}
-
 void spdm_test_case_digests_success_10 (void *test_context)
 {
     spdm_test_context_t *spdm_test_context;
@@ -242,7 +189,7 @@ void spdm_test_case_digests_success_10 (void *test_context)
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_DIGESTS, SPDM_RESPONDER_TEST_CASE_DIGESTS_SUCCESS_10,
-            COMMON_TEST_ID_END,
+            0,
             COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
         return;
     }
@@ -309,7 +256,7 @@ void spdm_test_case_digests_success_10 (void *test_context)
         test_result = COMMON_TEST_RESULT_FAIL;
     }
     common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_DIGESTS, SPDM_RESPONDER_TEST_CASE_DIGESTS_SUCCESS_10, 4,
+        SPDM_RESPONDER_TEST_GROUP_DIGESTS, SPDM_RESPONDER_TEST_CASE_DIGESTS_SUCCESS_10, 5,
         test_result, "response spdm_response_size - 0x%08x", spdm_response_size);
 }
 
@@ -324,10 +271,7 @@ void spdm_test_case_digests_version_mismatch (void *test_context)
     size_t spdm_response_size;
     common_test_result_t test_result;
     spdm_digests_test_buffer_t *test_buffer;
-    uint8_t mismatched_version[] = {
-        SPDM_MESSAGE_VERSION_10 - 1,
-        SPDM_MESSAGE_VERSION_12 + 1,
-    };
+    uint8_t mismatched_version[2];
     size_t index;
 
     spdm_test_context = test_context;
@@ -357,7 +301,7 @@ void spdm_test_case_digests_version_mismatch (void *test_context)
         if (LIBSPDM_STATUS_IS_ERROR(status)) {
             common_test_record_test_assertion (
                 SPDM_RESPONDER_TEST_GROUP_DIGESTS,
-                SPDM_RESPONDER_TEST_CASE_DIGESTS_VERSION_MISMATCH, COMMON_TEST_ID_END,
+                SPDM_RESPONDER_TEST_CASE_DIGESTS_VERSION_MISMATCH, 0,
                 COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
             continue;
         }
@@ -418,102 +362,6 @@ void spdm_test_case_digests_version_mismatch (void *test_context)
     }
 }
 
-void spdm_test_case_digests_unexpected_request (void *test_context)
-{
-    spdm_test_context_t *spdm_test_context;
-    void *spdm_context;
-    libspdm_return_t status;
-    spdm_get_digest_request_t spdm_request;
-    spdm_digest_response_t *spdm_response;
-    size_t spdm_response_size;
-    uint8_t message[LIBSPDM_MAX_SPDM_MSG_SIZE];
-    common_test_result_t test_result;
-    spdm_digests_test_buffer_t *test_buffer;
-
-    spdm_test_context = test_context;
-    spdm_context = spdm_test_context->spdm_context;
-    test_buffer = (void *)spdm_test_context->test_scratch_buffer;
-    LIBSPDM_ASSERT(spdm_test_context->test_scratch_buffer_size ==
-                   sizeof(test_buffer->version));
-
-    libspdm_zero_mem(&spdm_request, sizeof(spdm_request));
-    spdm_request.header.spdm_version = test_buffer->version;
-    spdm_request.header.request_response_code = SPDM_GET_DIGESTS;
-    spdm_request.header.param1 = 0;
-    spdm_request.header.param2 = 0;
-
-    spdm_response = (void *)message;
-    spdm_response_size = sizeof(message);
-    libspdm_zero_mem(message, sizeof(message));
-    status = libspdm_send_receive_data(spdm_context, NULL, false,
-                                       &spdm_request, sizeof(spdm_request),
-                                       spdm_response, &spdm_response_size);
-    if (LIBSPDM_STATUS_IS_ERROR(status)) {
-        common_test_record_test_assertion (
-            SPDM_RESPONDER_TEST_GROUP_DIGESTS, SPDM_RESPONDER_TEST_CASE_DIGESTS_UNEXPECTED_REQUEST,
-            COMMON_TEST_ID_END,
-            COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
-        return;
-    }
-
-    if (spdm_response_size >= sizeof(spdm_error_response_t)) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_DIGESTS, SPDM_RESPONDER_TEST_CASE_DIGESTS_UNEXPECTED_REQUEST, 1,
-        test_result, "response size - %d", spdm_response_size);
-    if (test_result == COMMON_TEST_RESULT_FAIL) {
-        return;
-    }
-
-    if (spdm_response->header.request_response_code == SPDM_ERROR) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_DIGESTS, SPDM_RESPONDER_TEST_CASE_DIGESTS_UNEXPECTED_REQUEST, 2,
-        test_result, "response code - 0x%02x", spdm_response->header.request_response_code);
-    if (test_result == COMMON_TEST_RESULT_FAIL) {
-        return;
-    }
-
-    if (spdm_response->header.spdm_version == test_buffer->version) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_DIGESTS, SPDM_RESPONDER_TEST_CASE_DIGESTS_UNEXPECTED_REQUEST, 3,
-        test_result, "response version - 0x%02x", spdm_response->header.spdm_version);
-    if (test_result == COMMON_TEST_RESULT_FAIL) {
-        return;
-    }
-
-    if (spdm_response->header.param1 == SPDM_ERROR_CODE_UNEXPECTED_REQUEST) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_DIGESTS, SPDM_RESPONDER_TEST_CASE_DIGESTS_UNEXPECTED_REQUEST, 4,
-        test_result, "response param1 - 0x%02x", spdm_response->header.param1);
-    if (test_result == COMMON_TEST_RESULT_FAIL) {
-        return;
-    }
-
-    if (spdm_response->header.param2 == 0) {
-        test_result = COMMON_TEST_RESULT_PASS;
-    } else {
-        test_result = COMMON_TEST_RESULT_FAIL;
-    }
-    common_test_record_test_assertion (
-        SPDM_RESPONDER_TEST_GROUP_DIGESTS, SPDM_RESPONDER_TEST_CASE_DIGESTS_UNEXPECTED_REQUEST, 5,
-        test_result, "response param2 - 0x%02x", spdm_response->header.param2);
-}
-
 common_test_case_t m_spdm_test_group_digests[] = {
     {SPDM_RESPONDER_TEST_CASE_DIGESTS_SUCCESS_10,
      "spdm_test_case_digests_success_10",
@@ -524,11 +372,6 @@ common_test_case_t m_spdm_test_group_digests[] = {
      "spdm_test_case_digests_version_mismatch",
      spdm_test_case_digests_version_mismatch,
      spdm_test_case_digests_setup_version_any,
-     spdm_test_case_common_teardown},
-    {SPDM_RESPONDER_TEST_CASE_DIGESTS_UNEXPECTED_REQUEST,
-     "spdm_test_case_digests_unexpected_request",
-     spdm_test_case_digests_unexpected_request,
-     spdm_test_case_digests_setup_version_capabilities,
      spdm_test_case_common_teardown},
     {COMMON_TEST_ID_END, NULL, NULL},
 };

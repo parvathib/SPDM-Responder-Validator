@@ -1,7 +1,7 @@
 /**
  *  Copyright Notice:
  *  Copyright 2021 DMTF. All rights reserved.
- *  License: BSD 3-Clause License. For full text see link: https://github.com/DMTF/spdm-emu/blob/main/LICENSE.md
+ *  License: BSD 3-Clause License. For full text see link: https://github.com/DMTF/SPDM-Responder-Validator/blob/main/LICENSE.md
  **/
 
 #include "library/common_test_utility_lib.h"
@@ -388,6 +388,11 @@ void common_test_run_test_suite (
         printf("fail to create log file: %s", COMMON_TEST_LOG_FILE_NAME);
         return;
     }
+
+    fprintf(m_log_file, "LIBSPDM_MAJOR_VERSION : 0x%02X\n", LIBSPDM_MAJOR_VERSION);
+    fprintf(m_log_file, "LIBSPDM_MINOR_VERSION : 0x%02X\n", LIBSPDM_MINOR_VERSION);
+    fprintf(m_log_file, "LIBSPDM_PATCH_VERSION : 0x%02X\n", LIBSPDM_PATCH_VERSION);
+    fprintf(m_log_file, "LIBSPDM_ALPHA : 0x%02X\n", LIBSPDM_ALPHA);
 
     m_test_suite_result = common_test_allocate_test_suite_result (test_suite);
 

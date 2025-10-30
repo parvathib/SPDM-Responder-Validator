@@ -1,7 +1,7 @@
 /**
  *  Copyright Notice:
  *  Copyright 2021 DMTF. All rights reserved.
- *  License: BSD 3-Clause License. For full text see link: https://github.com/DMTF/spdm-emu/blob/main/LICENSE.md
+ *  License: BSD 3-Clause License. For full text see link: https://github.com/DMTF/SPDM-Responder-Validator/blob/main/LICENSE.md
  **/
 
 #include "spdm_responder_test.h"
@@ -110,7 +110,7 @@ bool spdm_test_case_heartbeat_ack_setup_session (void *test_context,
              SPDM_ALGORITHMS_BASE_ASYM_ALGO_EDDSA_ED448;
     libspdm_set_data(spdm_context, LIBSPDM_DATA_REQ_BASE_ASYM_ALG, &parameter,
                      &data16, sizeof(data16));
-    data16 = SPDM_ALGORITHMS_KEY_SCHEDULE_HMAC_HASH;
+    data16 = SPDM_ALGORITHMS_KEY_SCHEDULE_SPDM;
     libspdm_set_data(spdm_context, LIBSPDM_DATA_KEY_SCHEDULE, &parameter, &data16,
                      sizeof(data16));
     data8 = SPDM_ALGORITHMS_OPAQUE_DATA_FORMAT_1;
@@ -226,7 +226,7 @@ void spdm_test_case_heartbeat_ack_success_11_dhe (void *test_context)
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_HEARTBEAT_ACK,
-            SPDM_RESPONDER_TEST_CASE_HEARTBEAT_ACK_SUCCESS_11_IN_DHE_SESSION, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_HEARTBEAT_ACK_SUCCESS_11_IN_DHE_SESSION, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
         return;
     }
@@ -282,10 +282,7 @@ void spdm_test_case_heartbeat_ack_version_mismatch (void *test_context)
     size_t spdm_response_size;
     common_test_result_t test_result;
     spdm_heartbeat_ack_test_buffer_t *test_buffer;
-    uint8_t mismatched_version[] = {
-        SPDM_MESSAGE_VERSION_10 - 1,
-        SPDM_MESSAGE_VERSION_12 + 1,
-    };
+    uint8_t mismatched_version[2];
     size_t index;
 
     spdm_test_context = test_context;
@@ -316,7 +313,7 @@ void spdm_test_case_heartbeat_ack_version_mismatch (void *test_context)
             common_test_record_test_assertion (
                 SPDM_RESPONDER_TEST_GROUP_HEARTBEAT_ACK,
                 SPDM_RESPONDER_TEST_CASE_HEARTBEAT_ACK_VERSION_MISMATCH_IN_DHE_SESSION,
-                COMMON_TEST_ID_END,
+                0,
                 COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
             continue;
         }
@@ -407,17 +404,17 @@ void spdm_test_case_heartbeat_ack_unexpected_request (void *test_context)
                                                 &req_slot_id_param, NULL);
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
-            SPDM_RESPONDER_TEST_GROUP_MEASUREMENTS,
-            SPDM_RESPONDER_TEST_CASE_MEASUREMENTS_UNEXPECTED_REQUEST_IN_DHE_SESSION_HS,
-            COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_GROUP_HEARTBEAT_ACK,
+            SPDM_RESPONDER_TEST_CASE_HEARTBEAT_ACK_UNEXPECTED_REQUEST_IN_DHE_SESSION_HS,
+            0,
             COMMON_TEST_RESULT_NOT_TESTED, "key_exchange failure");
         return;
     }
     if (test_buffer->heartbeat_period == 0) {
         common_test_record_test_assertion (
-            SPDM_RESPONDER_TEST_GROUP_MEASUREMENTS,
-            SPDM_RESPONDER_TEST_CASE_MEASUREMENTS_UNEXPECTED_REQUEST_IN_DHE_SESSION_HS,
-            COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_GROUP_HEARTBEAT_ACK,
+            SPDM_RESPONDER_TEST_CASE_HEARTBEAT_ACK_UNEXPECTED_REQUEST_IN_DHE_SESSION_HS,
+            0,
             COMMON_TEST_RESULT_NOT_TESTED, "heartbeat_period is 0");
         return;
     }
@@ -438,7 +435,7 @@ void spdm_test_case_heartbeat_ack_unexpected_request (void *test_context)
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_HEARTBEAT_ACK,
             SPDM_RESPONDER_TEST_CASE_HEARTBEAT_ACK_UNEXPECTED_REQUEST_IN_DHE_SESSION_HS,
-            COMMON_TEST_ID_END,
+            0,
             COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
         return;
     }
@@ -539,7 +536,7 @@ void spdm_test_case_heartbeat_ack_session_required (void *test_context)
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         common_test_record_test_assertion (
             SPDM_RESPONDER_TEST_GROUP_HEARTBEAT_ACK,
-            SPDM_RESPONDER_TEST_CASE_HEARTBEAT_ACK_SESSION_REQUIRED, COMMON_TEST_ID_END,
+            SPDM_RESPONDER_TEST_CASE_HEARTBEAT_ACK_SESSION_REQUIRED, 0,
             COMMON_TEST_RESULT_NOT_TESTED, "send/receive failure");
         return;
     }
