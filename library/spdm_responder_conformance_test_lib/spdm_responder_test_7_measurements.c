@@ -25,6 +25,67 @@ typedef struct {
 static uint8_t m_cert_chain_buffer[SPDM_MAX_CERTIFICATE_CHAIN_SIZE];
 static size_t m_cert_chain_buffer_size;
 
+
+
+/* Helper function to set nonce from environment variable */
+void set_nonce_from_env(uint8_t *nonce_buffer)
+{
+    const char *env_nonce = getenv("SPDM_NONCE");
+    if (env_nonce != NULL && strlen(env_nonce) == (SPDM_NONCE_SIZE * 2)) {
+        /* Convert hex string to bytes */
+        for (size_t i = 0; i < SPDM_NONCE_SIZE; i++) {
+            char hex_byte[3] = {env_nonce[i*2], env_nonce[i*2+1], '\0'};
+            nonce_buffer[i] = (uint8_t)strtol(hex_byte, NULL, 16);
+        }
+    } else {
+        /* Use default/zero nonce if env var not set or invalid */
+        libspdm_zero_mem(nonce_buffer, SPDM_NONCE_SIZE);
+    }
+}
+
+void write_certificate_chain_to_file(uint8_t *cert_chain_buffer, size_t cert_chain_size, uint8_t slot_id)
+{
+    FILE *file;
+    char file_name[64];
+    uint32_t cert_start = 52; /*SPDM cert chain metadata size - fixed for SHA384*/
+
+    snprintf(file_name, sizeof(file_name), "certificate_chain_slot_%02x.der", slot_id);
+    file = fopen(file_name, "wb");
+    if (file != NULL)
+    {
+        /* Skip SPDM metadata and write only the certificate chain */
+        if (cert_chain_size > cert_start) {
+            fwrite(cert_chain_buffer + cert_start, 1, cert_chain_size - cert_start, file);
+            printf("Certificate chain written to %s (size: %zu bytes, skipped %u bytes metadata)\n", 
+                   file_name, cert_chain_size - cert_start, cert_start);
+        } else {
+            /* If size is too small, write the whole buffer */
+            fwrite(cert_chain_buffer, 1, cert_chain_size, file);
+            printf("Certificate chain written to %s (size: %zu bytes, no metadata skipped)\n", 
+                   file_name, cert_chain_size);
+        }
+        fclose(file);
+    }
+}
+
+void write_measurement_block_to_file(uint8_t *measurement_block,
+                                     uint32_t measurement_block_length, uint8_t index)
+{
+    FILE *file;
+    char file_name[64];
+
+    uint8_t metadata_size = sizeof(spdm_measurement_block_common_header_t) + sizeof(spdm_measurement_block_dmtf_header_t);
+
+    uint8_t *measurement_block_value = measurement_block + metadata_size;
+    snprintf(file_name, sizeof(file_name), "measurement_block_%02x.bin", index);
+    file = fopen(file_name, "wb");
+    if (file != NULL)
+    {
+        fwrite(measurement_block_value, 1, measurement_block_length - metadata_size, file);
+        fclose(file);
+    }
+}
+
 bool spdm_test_case_measurements_setup_vca_challenge_session (void *test_context, bool need_session,
                                                               size_t spdm_version_count,
                                                               spdm_version_number_t *spdm_version)
@@ -181,6 +242,9 @@ bool spdm_test_case_measurements_setup_vca_challenge_session (void *test_context
     if (LIBSPDM_STATUS_IS_ERROR(status)) {
         return false;
     }
+
+    /* Write certificate chain to file */
+    write_certificate_chain_to_file(m_cert_chain_buffer, m_cert_chain_buffer_size, 0);
 
     status = libspdm_challenge (spdm_context, NULL, 0,
                                 SPDM_CHALLENGE_REQUEST_ALL_MEASUREMENTS_HASH,
@@ -561,7 +625,7 @@ void spdm_test_case_measurements_success_10_11_12 (void *test_context, uint8_t v
         }
         spdm_request.header.param2 =
             SPDM_GET_MEASUREMENTS_REQUEST_MEASUREMENT_OPERATION_TOTAL_NUMBER_OF_MEASUREMENTS;
-        /* ignore spdm_request.nonce */
+        set_nonce_from_env(spdm_request.nonce);
         spdm_request.slot_id_param = slot_id;
         if ((spdm_request.header.param1 & SPDM_GET_MEASUREMENTS_REQUEST_ATTRIBUTES_GENERATE_SIGNATURE) != 0) {
             if (version == SPDM_MESSAGE_VERSION_10) {
@@ -772,7 +836,7 @@ void spdm_test_case_measurements_success_10_11_12 (void *test_context, uint8_t v
         }
         spdm_request.header.param2 =
             SPDM_GET_MEASUREMENTS_REQUEST_MEASUREMENT_OPERATION_ALL_MEASUREMENTS;
-        /* ignore spdm_request.nonce */
+        set_nonce_from_env(spdm_request.nonce);
         spdm_request.slot_id_param = slot_id;
         if ((spdm_request.header.param1 & SPDM_GET_MEASUREMENTS_REQUEST_ATTRIBUTES_GENERATE_SIGNATURE) != 0) {
             if (version == SPDM_MESSAGE_VERSION_10) {
@@ -985,7 +1049,7 @@ void spdm_test_case_measurements_success_10_11_12 (void *test_context, uint8_t v
         spdm_request.header.request_response_code = SPDM_GET_MEASUREMENTS;
         spdm_request.header.param1 = 0;
         spdm_request.header.param2 = 0;
-        /* ignore spdm_request.nonce */
+        set_nonce_from_env(spdm_request.nonce);
         spdm_request.slot_id_param = slot_id;
 
         meas_count = 0;
@@ -1128,6 +1192,8 @@ void spdm_test_case_measurements_success_10_11_12 (void *test_context, uint8_t v
                 } else {
                     test_result = COMMON_TEST_RESULT_FAIL;
                 }
+            } else {
+                write_measurement_block_to_file(measurement_record_out, measurement_record_length_out, 0xFD);
             }
             common_test_record_test_assertion (
                 SPDM_RESPONDER_TEST_GROUP_MEASUREMENTS, case_id, 20,
